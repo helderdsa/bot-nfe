@@ -101,6 +101,8 @@ try:
                     print(f"Banco Crédito: {transaction.get('credit_bank')}")
                     print(f"Centro de Custo: {transaction.get('cost_center')}")
                     
+
+                    
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".btnAcesso")))
                     time.sleep(0.5)
                     driver.find_element(By.CSS_SELECTOR, ".btnAcesso").click()
