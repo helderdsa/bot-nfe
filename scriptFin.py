@@ -1,6 +1,7 @@
 import time
 import requests
 import os
+import pyautogui
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -61,6 +62,11 @@ try:
         print(f"✓ Total de transações encontradas: {len(transactions)}")
         print(f"✓ Total geral (totalCount): {data_json.get('totalCount', 'N/A')}")
         
+        driver.get("https://www.nfse.gov.br/EmissorNacional/Login?ReturnUrl=%2fEmissorNacional")
+        wait.until(EC.presence_of_element_located((By.CLASS_NAME, "img-certificado")))
+        time.sleep(0.5)
+        driver.find_element(By.CLASS_NAME, "img-certificado").click()
+        
         # Iterar sobre cada transação
         print("\n===== Processando transações =====")
         for index, transaction in enumerate(transactions):
@@ -83,12 +89,6 @@ try:
             print(f"Banco Crédito: {transaction.get('credit_bank')}")
             print(f"Centro de Custo: {transaction.get('cost_center')}")
             
-            driver.get("https://www.nfse.gov.br/EmissorNacional/Login?ReturnUrl=%2fEmissorNacional")
-
-            wait.until(EC.presence_of_element_located((By.CLASS_NAME, "img-certificado")))
-            time.sleep(0.5)
-            driver.find_element(By.CLASS_NAME, "img-certificado").click()
-
             wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".btnAcesso")))
             time.sleep(0.5)
             driver.find_element(By.CSS_SELECTOR, ".btnAcesso").click()
@@ -129,9 +129,9 @@ try:
             time.sleep(0.5)
             driver.find_element(By.CSS_SELECTOR, "input.select2-search__field").send_keys("Acari")
 
-            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "li.select2-results__option")))
+            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".select2-results__option--highlighted")))
             time.sleep(0.5)
-            driver.find_element(By.CSS_SELECTOR, "li.select2-results__option").click()
+            driver.find_element(By.CSS_SELECTOR, ".select2-results__option--highlighted").click()
 
             wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "span[aria-labelledby=select2-ServicoPrestado_CodigoTributacaoNacional-container]")))
             time.sleep(0.5)
@@ -141,11 +141,9 @@ try:
             time.sleep(0.5)
             driver.find_element(By.CSS_SELECTOR, "input.select2-search__field").send_keys("171401")
 
-            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "li.select2-results__option")))
+            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".select2-results__option--highlighted")))
             time.sleep(0.5)
-            driver.find_element(By.CSS_SELECTOR, "li.select2-results__option").click()
-
-            time.sleep(5)
+            driver.find_element(By.CSS_SELECTOR, ".select2-results__option--highlighted").click()
 
             wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.radiobutton > label")))
             time.sleep(0.5)
@@ -164,7 +162,10 @@ try:
 
             wait.until(EC.presence_of_element_located((By.ID, "Valores_ValorServico")))
             time.sleep(0.5)
-            driver.find_element(By.ID, "Valores_ValorServico").send_keys(str(transaction.get('amount', ''))) #valor aqui
+            # Formatar valor com 2 casas decimais e vírgula (padrão BR)
+            valor = transaction.get('amount', '0')
+            valor_formatado = f"{float(valor):.2f}".replace('.', ',')
+            driver.find_element(By.ID, "Valores_ValorServico").send_keys(valor_formatado) #valor aqui
 
             wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".radiobutton")))
             time.sleep(0.5)
