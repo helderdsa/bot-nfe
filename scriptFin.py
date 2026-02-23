@@ -1,7 +1,6 @@
 import time
 import requests
 import os
-import pyautogui
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -186,10 +185,8 @@ try:
                     radio_options = driver.find_elements(By.CSS_SELECTOR, ".radiobutton")
                     radio_options[0].find_element(By.CSS_SELECTOR, "label").click()
 
-                    time.sleep(0.5)
                     radio_options[2].find_element(By.CSS_SELECTOR, "label").click()
 
-                    time.sleep(0.5)
                     radio_options[6].find_element(By.CSS_SELECTOR, "label").click()
 
                     wait.until(EC.presence_of_element_located((By.ID, "TributacaoFederal_PISCofins_SituacaoTributaria_chosen")))
