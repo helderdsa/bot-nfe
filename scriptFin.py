@@ -189,24 +189,20 @@ try:
                     radio_options[6].find_element(By.CSS_SELECTOR, "label").click()
 
                     wait.until(EC.presence_of_element_located((By.ID, "TributacaoFederal_PISCofins_SituacaoTributaria_chosen")))
-                    time.sleep(0.5)
                     driver.find_elements(By.ID, "TributacaoFederal_PISCofins_SituacaoTributaria_chosen")[0].click()
 
-                    time.sleep(0.5)
                     driver.find_elements(By.ID, "TributacaoFederal_PISCofins_SituacaoTributaria_chosen")[0].find_element(By.CSS_SELECTOR, "div > div > input").send_keys("00")
 
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div > div > ul > li")))
-                    time.sleep(0.5)
                     driver.find_elements(By.ID, "TributacaoFederal_PISCofins_SituacaoTributaria_chosen")[0].find_element(By.CSS_SELECTOR, "div > div > ul > li").click()
                     
                     wait.until(EC.presence_of_element_located((By.ID, "TributacaoFederal_PISCofins_TipoRetencao_chosen")))
-                    time.sleep(0.5)
                     driver.find_elements(By.ID, "TributacaoFederal_PISCofins_TipoRetencao_chosen")[0].click()
 
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div > ul > li[data-option-array-index='1']")))
-                    time.sleep(0.5)
                     driver.find_elements(By.ID, "TributacaoFederal_PISCofins_TipoRetencao_chosen")[0].find_element(By.CSS_SELECTOR, "div > ul > li[data-option-array-index='1']").click()
 
+                    time.sleep(0.5)
                     driver.get("https://www.nfse.gov.br/EmissorNacional/Dashboard")
                     
                     # Se chegou aqui sem erro, marca como sucesso
