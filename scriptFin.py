@@ -27,8 +27,9 @@ driver = webdriver.Chrome(options=options)
 wait = WebDriverWait(driver, 20)
 
 try:
-    # URL da API
-    api_url = "https://app.advbox.com.br/api/v1/transactions?date_payment_start=2026-01-01&date_payment_end=2026-01-31&entry_type=income"
+    # URL base da API (sem offset/limit)
+    api_base_url = "https://app.advbox.com.br/api/v1/transactions?date_payment_start=2026-02-01&date_payment_end=2026-02-28"
+    # api_base_url = "https://app.advbox.com.br/api/v1/transactions?date_payment_start=2026-01-01&date_payment_end=2026-01-31&entry_type=income"
     
     # Criar sessão para manter cookies
     session = requests.Session()
@@ -45,20 +46,43 @@ try:
         "Upgrade-Insecure-Requests": "1"
     }
     
-    # Fazer requisição à API
-    response = session.get(api_url, headers=headers)
-    
-    # Debug: Mostrar status da resposta
-    print(f"Status Code: {response.status_code}")
-    
-    # Verificar se a requisição foi bem-sucedida
-    if response.status_code == 200:
+    LIMIT = 1000
+    transactions = []
+    offset = 0
+    total_count = None
+
+    # Buscar todos os registros usando paginação por offset
+    while True:
+        api_url = f"{api_base_url}&offset={offset}&limit={LIMIT}"
+        response = session.get(api_url, headers=headers)
+
+        print(f"Status Code: {response.status_code} (offset={offset})")
+
+        if response.status_code != 200:
+            print(f"✗ Erro ao fazer requisição à API. Status code: {response.status_code}")
+            print(f"✗ Resposta da API: {response.text}")
+            break
+
         data_json = response.json()
-        transactions = data_json.get('data', [])
-        
-        print(f"✓ Dados obtidos com sucesso!")
-        print(f"✓ Total de transações encontradas: {len(transactions)}")
-        print(f"✓ Total geral (totalCount): {data_json.get('totalCount', 'N/A')}")
+
+        if total_count is None:
+            total_count = data_json.get('totalCount', 0)
+            print(f"✓ Total geral (totalCount): {total_count}")
+
+        page_data = data_json.get('data', [])
+        transactions.extend(page_data)
+        print(f"✓ Página carregada: {len(page_data)} registros (total acumulado: {len(transactions)})")
+
+        if len(transactions) >= total_count or len(page_data) == 0:
+            break
+
+        offset += LIMIT
+
+    print(f"✓ Todos os dados obtidos com sucesso!")
+    print(f"✓ Total de transações encontradas: {len(transactions)}")
+
+    # Verificar se a requisição foi bem-sucedida
+    if len(transactions) > 0:
         
         driver.get("https://www.nfse.gov.br/EmissorNacional/Login?ReturnUrl=%2fEmissorNacional")
         wait.until(EC.presence_of_element_located((By.CLASS_NAME, "img-certificado")))
@@ -166,10 +190,12 @@ try:
                     driver.find_element(By.CSS_SELECTOR, "#ServicoPrestado_Descricao").click()
 
                     time.sleep(0.5)
-                    driver.find_element(By.CSS_SELECTOR, "#ServicoPrestado_Descricao").send_keys(str(transaction.get('description', ''))) #descrição aqui
-
+                    if transaction.get('category') == "IMPLANTAÇÕES":
+                        driver.find_element(By.CSS_SELECTOR, "#ServicoPrestado_Descricao").send_keys("Pagamento referente a implantação de letras, parcela "+str(transaction.get('description', ''))) #descrição aqui
+                    elif transaction.get('category') == "PRECATÓRIOS" or transaction.get('category') == "ALVARÁS" or transaction.get('category') == "HONORÁRIOS DE SUCUMBÊNCIA":
+                        driver.find_element(By.CSS_SELECTOR, "#ServicoPrestado_Descricao").send_keys("Pagamento referente aos honorários contratuais, nº do processo: "+str(transaction.get('process_number', ''))) #descrição aqui
                     wait.until(EC.presence_of_element_located((By.CLASS_NAME, "btn-primary")))
-                    time.sleep(0.5)
+                    time.sleep(5)
                     driver.find_element(By.CLASS_NAME, "btn-primary").click()
 
                     wait.until(EC.presence_of_element_located((By.ID, "Valores_ValorServico")))
@@ -202,9 +228,12 @@ try:
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div > ul > li[data-option-array-index='1']")))
                     driver.find_elements(By.ID, "TributacaoFederal_PISCofins_TipoRetencao_chosen")[0].find_element(By.CSS_SELECTOR, "div > ul > li[data-option-array-index='1']").click()
 
+                    # wait.until(EC.presence_of_element_located((By.ID, "btnDownloadDANFSE")))
                     time.sleep(0.5)
                     driver.get("https://www.nfse.gov.br/EmissorNacional/Dashboard")
                     
+                    # FINALIZAR ID: btnDownloadDANFSE
+
                     # Se chegou aqui sem erro, marca como sucesso
                     sucesso = True
                     print(f"✓ Transação {index + 1} processada com sucesso!")
@@ -228,11 +257,6 @@ try:
             
             # Avança para a próxima transação
             index += 1
-    else:
-        print(f"✗ Erro ao fazer requisição à API. Status code: {response.status_code}")
-        print(f"✗ Resposta da API: {response.text}")
-        print(f"✗ Headers enviados: {headers}")
-        transactions = []
         
 except requests.exceptions.RequestException as e:
     print(f"✗ Erro na requisição à API: {e}")
@@ -244,6 +268,3 @@ except Exception as e:
     transactions = []
 
 # ===== FIM DA REQUISIÇÃO À API =====
-
-
-
