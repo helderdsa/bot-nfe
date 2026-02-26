@@ -96,6 +96,13 @@ try:
         
         while index < len(transactions):
             transaction = transactions[index]
+
+            if transaction.get('entry_type') == "expense":
+                print(f"\n--- Transação {index + 1} de {len(transactions)} ---")
+                print(f"⏭ Pulando transação ID {transaction.get('id')} - categoria 'TAXAS BANCÁRIAS' não gera NF.")
+                index += 1
+                continue
+
             tentativas = 0
             sucesso = False
             
@@ -194,8 +201,10 @@ try:
                         driver.find_element(By.CSS_SELECTOR, "#ServicoPrestado_Descricao").send_keys("Pagamento referente a implantação de letras, parcela "+str(transaction.get('description', ''))) #descrição aqui
                     elif transaction.get('category') == "PRECATÓRIOS" or transaction.get('category') == "ALVARÁS" or transaction.get('category') == "HONORÁRIOS DE SUCUMBÊNCIA":
                         driver.find_element(By.CSS_SELECTOR, "#ServicoPrestado_Descricao").send_keys("Pagamento referente aos honorários contratuais, nº do processo: "+str(transaction.get('process_number', ''))) #descrição aqui
+                    else :
+                        driver.find_element(By.CSS_SELECTOR, "#ServicoPrestado_Descricao").send_keys("Pagamento referente a "+str(transaction.get('category', ''))) #descrição aqui
                     wait.until(EC.presence_of_element_located((By.CLASS_NAME, "btn-primary")))
-                    time.sleep(5)
+                    time.sleep(0.5)
                     driver.find_element(By.CLASS_NAME, "btn-primary").click()
 
                     wait.until(EC.presence_of_element_located((By.ID, "Valores_ValorServico")))
@@ -227,8 +236,13 @@ try:
 
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div > ul > li[data-option-array-index='1']")))
                     driver.find_elements(By.ID, "TributacaoFederal_PISCofins_TipoRetencao_chosen")[0].find_element(By.CSS_SELECTOR, "div > ul > li[data-option-array-index='1']").click()
+                    time.sleep(0.5)
 
-                    # wait.until(EC.presence_of_element_located((By.ID, "btnDownloadDANFSE")))
+                    wait.until(EC.presence_of_element_located((By.CLASS_NAME, "btn-primary")))
+                    time.sleep(0.5)
+                    driver.find_element(By.CLASS_NAME, "btn-primary").click()
+
+                    wait.until(EC.presence_of_element_located((By.ID, "btnDownloadDANFSE")))
                     time.sleep(0.5)
                     driver.get("https://www.nfse.gov.br/EmissorNacional/Dashboard")
                     
