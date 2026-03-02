@@ -1,5 +1,8 @@
+import os
 import time
 import requests
+import openpyxl
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -25,6 +28,12 @@ options.add_argument("--ignore-certificate-errors")
 
 driver = webdriver.Chrome(options=options)
 wait = WebDriverWait(driver, 20)
+
+# Listas de rastreamento
+transactions = []
+ids_emitidas = []
+ids_erro = []
+ids_puladas = []
 
 try:
     # URL base da API (sem offset/limit)
@@ -100,6 +109,7 @@ try:
             if transaction.get('entry_type') == "expense":
                 print(f"\n--- Transação {index + 1} de {len(transactions)} ---")
                 print(f"⏭ Pulando transação ID {transaction.get('id')} - categoria 'TAXAS BANCÁRIAS' não gera NF.")
+                ids_puladas.append(transaction.get('id'))
                 index += 1
                 continue
 
@@ -217,11 +227,11 @@ try:
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".radiobutton")))
                     time.sleep(0.5)
                     radio_options = driver.find_elements(By.CSS_SELECTOR, ".radiobutton")
-                    radio_options[0].find_element(By.CSS_SELECTOR, "label").click()
+                    radio_options[0].find_element(BY.CSS_SELECTOR, "label").click()
 
-                    radio_options[2].find_element(By.CSS_SELECTOR, "label").click()
+                    radio_options[2].find_element(BY.CSS_SELECTOR, "label").click()
 
-                    radio_options[6].find_element(By.CSS_SELECTOR, "label").click()
+                    radio_options[6].find_element(BY.CSS_SELECTOR, "label").click()
 
                     wait.until(EC.presence_of_element_located((By.ID, "TributacaoFederal_PISCofins_SituacaoTributaria_chosen")))
                     driver.find_elements(By.ID, "TributacaoFederal_PISCofins_SituacaoTributaria_chosen")[0].click()
@@ -242,6 +252,11 @@ try:
                     time.sleep(0.5)
                     driver.find_element(By.CLASS_NAME, "btn-primary").click()
 
+
+                    wait.until(EC.presence_of_element_located((By.ID, "btnProsseguir")))
+                    time.sleep(0.5)
+                    driver.find_element(By.ID, "btnProsseguir").click()
+
                     wait.until(EC.presence_of_element_located((By.ID, "btnDownloadDANFSE")))
                     time.sleep(0.5)
                     driver.get("https://www.nfse.gov.br/EmissorNacional/Dashboard")
@@ -250,6 +265,7 @@ try:
 
                     # Se chegou aqui sem erro, marca como sucesso
                     sucesso = True
+                    ids_emitidas.append(transaction.get('id'))
                     print(f"✓ Transação {index + 1} processada com sucesso!")
                     
                 except Exception as e:
@@ -267,6 +283,7 @@ try:
                     if tentativas >= max_tentativas:
                         print(f"✗ Número máximo de tentativas atingido para a transação {index + 1}")
                         print(f"✗ Pulando para a próxima transação...")
+                        ids_erro.append(transaction.get('id'))
                         sucesso = True  # Marca como "sucesso" para pular para a próxima
             
             # Avança para a próxima transação
@@ -275,10 +292,35 @@ try:
 except requests.exceptions.RequestException as e:
     print(f"✗ Erro na requisição à API: {e}")
     print(f"✗ Tipo do erro: {type(e).__name__}")
-    transactions = []
 except Exception as e:
     print(f"✗ Erro inesperado: {e}")
     print(f"✗ Tipo do erro: {type(e).__name__}")
-    transactions = []
+finally:
+    # Calcular IDs que faltaram (não chegaram a ser processadas)
+    ids_processados = set(ids_emitidas) | set(ids_erro) | set(ids_puladas)
+    ids_faltaram = [t.get('id') for t in transactions if t.get('id') not in ids_processados]
 
-# ===== FIM DA REQUISIÇÃO À API =====
+    # Gerar planilha de relatório
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Relatório NF"
+    ws.append(["Emitidas", "Puladas por Erro", "Faltaram"])
+
+    max_len = max(len(ids_emitidas), len(ids_erro), len(ids_faltaram), 1)
+    for i in range(max_len):
+        ws.append([
+            ids_emitidas[i] if i < len(ids_emitidas) else "",
+            ids_erro[i] if i < len(ids_erro) else "",
+            ids_faltaram[i] if i < len(ids_faltaram) else ""
+        ])
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    filename = os.path.join(script_dir, f"relatorio_nf_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
+    wb.save(filename)
+    print(f"\n===== RELATÓRIO FINAL =====")
+    print(f"✓ Planilha salva: {filename}")
+    print(f"  - Emitidas:        {len(ids_emitidas)}")
+    print(f"  - Puladas por erro: {len(ids_erro)}")
+    print(f"  - Faltaram:        {len(ids_faltaram)}")
+
+# ===== FIM DA REQUISIÇÃO À API =====#
