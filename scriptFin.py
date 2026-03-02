@@ -35,6 +35,33 @@ ids_emitidas = []
 ids_erro = []
 ids_puladas = []
 
+# ===== SELEÇÃO DE CATEGORIA =====
+print("\n===== Filtro de Categoria =====")
+print("Selecione a categoria para processar:")
+print("  0 - TODAS")
+print("  1 - IMPLANTAÇÕES")
+print("  2 - PRECATÓRIOS")
+print("  3 - ALVARÁS")
+
+_categorias_opcoes = {
+    "0": None,
+    "1": "IMPLANTAÇÕES",
+    "2": "PRECATÓRIOS",
+    "3": "ALVARÁS",
+}
+
+while True:
+    _escolha = input("Digite o número da opção: ").strip()
+    if _escolha in _categorias_opcoes:
+        categoria_filtro = _categorias_opcoes[_escolha]
+        if categoria_filtro:
+            print(f"✓ Categoria selecionada: {categoria_filtro}")
+        else:
+            print("✓ Processando todas as categorias.")
+        break
+    else:
+        print("Opção inválida. Tente novamente.")
+
 try:
     # URL base da API (sem offset/limit)
     api_base_url = "https://app.advbox.com.br/api/v1/transactions?date_payment_start=2026-02-01&date_payment_end=2026-02-28"
@@ -90,6 +117,11 @@ try:
     print(f"✓ Todos os dados obtidos com sucesso!")
     print(f"✓ Total de transações encontradas: {len(transactions)}")
 
+    # Aplicar filtro de categoria
+    if categoria_filtro:
+        transactions = [t for t in transactions if t.get('category') == categoria_filtro]
+        print(f"✓ Transações após filtro '{categoria_filtro}': {len(transactions)}")
+
     # Verificar se a requisição foi bem-sucedida
     if len(transactions) > 0:
         
@@ -109,6 +141,13 @@ try:
             if transaction.get('entry_type') == "expense":
                 print(f"\n--- Transação {index + 1} de {len(transactions)} ---")
                 print(f"⏭ Pulando transação ID {transaction.get('id')} - categoria 'TAXAS BANCÁRIAS' não gera NF.")
+                ids_puladas.append(transaction.get('id'))
+                index += 1
+                continue
+
+            if transaction.get('category') == "REEMBOLSO DE CUSTO POR CLIENTES":
+                print(f"\n--- Transação {index + 1} de {len(transactions)} ---")
+                print(f"⏭ Pulando transação ID {transaction.get('id')} - categoria 'REEMBOLSO DE CUSTO POR CLIENTES' não gera NF.")
                 ids_puladas.append(transaction.get('id'))
                 index += 1
                 continue
@@ -227,11 +266,11 @@ try:
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".radiobutton")))
                     time.sleep(0.5)
                     radio_options = driver.find_elements(By.CSS_SELECTOR, ".radiobutton")
-                    radio_options[0].find_element(BY.CSS_SELECTOR, "label").click()
+                    radio_options[0].find_element(By.CSS_SELECTOR, "label").click()
 
-                    radio_options[2].find_element(BY.CSS_SELECTOR, "label").click()
+                    radio_options[2].find_element(By.CSS_SELECTOR, "label").click()
 
-                    radio_options[6].find_element(BY.CSS_SELECTOR, "label").click()
+                    radio_options[6].find_element(By.CSS_SELECTOR, "label").click()
 
                     wait.until(EC.presence_of_element_located((By.ID, "TributacaoFederal_PISCofins_SituacaoTributaria_chosen")))
                     driver.find_elements(By.ID, "TributacaoFederal_PISCofins_SituacaoTributaria_chosen")[0].click()
@@ -255,10 +294,10 @@ try:
 
                     wait.until(EC.presence_of_element_located((By.ID, "btnProsseguir")))
                     time.sleep(0.5)
-                    driver.find_element(By.ID, "btnProsseguir").click()
+                    # driver.find_element(By.ID, "btnProsseguir").click()
 
-                    wait.until(EC.presence_of_element_located((By.ID, "btnDownloadDANFSE")))
-                    time.sleep(0.5)
+                    # wait.until(EC.presence_of_element_located((By.ID, "btnDownloadDANFSE")))
+                    # time.sleep(0.5)
                     driver.get("https://www.nfse.gov.br/EmissorNacional/Dashboard")
                     
                     # FINALIZAR ID: btnDownloadDANFSE

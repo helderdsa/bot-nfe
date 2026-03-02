@@ -19,17 +19,18 @@ from selenium.webdriver.support import expected_conditions as EC
 # Lógica do bot (adaptada para rodar em thread separada)
 # ============================================================
 
-def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: callable, resume_path: str = None):
+def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: callable, resume_path: str = None, categoria_filtro: str = None):
     """
     Executa o bot de emissão de NF-e.
 
     Parâmetros
     ----------
-    start_date   : str  – data inicial no formato YYYY-MM-DD
-    end_date     : str  – data final   no formato YYYY-MM-DD
-    cancel_event : threading.Event – setado externamente para cancelar
-    log          : callable(str) – função para enviar mensagens ao log da GUI
-    resume_path  : str  – caminho para o XLSX de relatório anterior (opcional)
+    start_date       : str  – data inicial no formato YYYY-MM-DD
+    end_date         : str  – data final   no formato YYYY-MM-DD
+    cancel_event     : threading.Event – setado externamente para cancelar
+    log              : callable(str) – função para enviar mensagens ao log da GUI
+    resume_path      : str  – caminho para o XLSX de relatório anterior (opcional)
+    categoria_filtro : str  – categoria para filtrar (None = todas)
     """
 
     options = Options()
@@ -145,6 +146,11 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
 
         log(f"✓ Total de transações encontradas: {len(transactions)}")
 
+        # ===== FILTRO DE CATEGORIA =====
+        if categoria_filtro and categoria_filtro != "TODAS":
+            transactions = [t for t in transactions if t.get("category") == categoria_filtro]
+            log(f"✓ Transações após filtro '{categoria_filtro}': {len(transactions)}")
+
         # ===== PROCESSAMENTO =====
         if len(transactions) == 0:
             log("⚠ Nenhuma transação encontrada para o período informado.")
@@ -185,6 +191,13 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
             if transaction.get("entry_type") == "expense":
                 log(f"\n--- Transação {index + 1}/{len(transactions)} ---")
                 log(f"⏭ Pulando ID {tid} - despesa não gera NF.")
+                ids_puladas.append(tid)
+                index += 1
+                continue
+
+            if transaction.get("category") == "REEMBOLSO DE CUSTO POR CLIENTES":
+                log(f"\n--- Transação {index + 1}/{len(transactions)} ---")
+                log(f"⏭ Pulando ID {tid} - 'REEMBOLSO DE CUSTO POR CLIENTES' não gera NF.")
                 ids_puladas.append(tid)
                 index += 1
                 continue
@@ -469,6 +482,21 @@ class App(ctk.CTk):
         )
         self.entry_end.grid(row=0, column=3, padx=(0, 16), pady=12)
 
+        # Frame de filtro de categoria
+        cat_frame = ctk.CTkFrame(self)
+        cat_frame.pack(padx=30, pady=(0, 4), fill="x")
+
+        ctk.CTkLabel(cat_frame, text="Categoria:").grid(
+            row=0, column=0, padx=(16, 8), pady=12, sticky="w"
+        )
+        self._var_categoria = ctk.StringVar(value="TODAS")
+        ctk.CTkOptionMenu(
+            cat_frame,
+            variable=self._var_categoria,
+            values=["TODAS", "IMPLANTAÇÕES", "PRECATÓRIOS", "ALVARÁS"],
+            width=220,
+        ).grid(row=0, column=1, padx=(0, 16), pady=12, sticky="w")
+
         # Frame de seleção de relatório anterior
         file_frame = ctk.CTkFrame(self)
         file_frame.pack(padx=30, pady=(0, 4), fill="x")
@@ -590,10 +618,11 @@ class App(ctk.CTk):
         self.btn_cancel.configure(state="normal")
 
         resume = self.entry_resume.get().strip() or None
+        categoria = self._var_categoria.get()
 
         self._bot_thread = threading.Thread(
             target=self._run_bot_thread,
-            args=(start, end, resume),
+            args=(start, end, resume, categoria),
             daemon=True
         )
         self._bot_thread.start()
@@ -607,9 +636,9 @@ class App(ctk.CTk):
     # Thread do bot
     # ----------------------------------------------------------
 
-    def _run_bot_thread(self, start: str, end: str, resume: str = None):
+    def _run_bot_thread(self, start: str, end: str, resume: str = None, categoria: str = None):
         try:
-            run_bot(start, end, self._cancel_event, self._enqueue_log, resume_path=resume)
+            run_bot(start, end, self._cancel_event, self._enqueue_log, resume_path=resume, categoria_filtro=categoria)
         except Exception as e:
             self._enqueue_log(f"✗ Erro fatal não tratado: {e}")
             self._enqueue_log(f"✗ Tipo: {type(e).__name__}")
