@@ -17,6 +17,18 @@ from selenium.webdriver.support import expected_conditions as EC
 
 
 # ============================================================
+# Utilitários
+# ============================================================
+
+def _fmt_date(date_str: str) -> str:
+    """Converte YYYY-MM-DD para DD-MM-YYYY."""
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d").strftime("%d-%m-%Y")
+    except (ValueError, TypeError):
+        return date_str or ""
+
+
+# ============================================================
 # Lógica do bot (adaptada para rodar em thread separada)
 # ============================================================
 
@@ -214,7 +226,7 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                     log(f"\n--- Transação {index + 1}/{len(transactions)} ---")
                     log(f"ID: {transaction.get('id')}")
                     log(f"Tipo: {transaction.get('entry_type')}")
-                    log(f"Data Pagamento: {transaction.get('date_payment')}")
+                    log(f"Data Pagamento: {_fmt_date(transaction.get('date_payment', ''))}")
                     log(f"Valor: {transaction.get('amount')}")
                     log(f"Nome: {transaction.get('name')}")
                     log(f"Categoria: {transaction.get('category')}")
@@ -225,7 +237,7 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
 
                     wait.until(EC.presence_of_element_located((By.ID, "DataCompetencia")))
                     time.sleep(0.5)
-                    driver.find_element(By.ID, "DataCompetencia").send_keys(transaction.get("date_payment", ""))
+                    driver.find_element(By.ID, "DataCompetencia").send_keys(_fmt_date(transaction.get("date_payment", "")))
 
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "body")))
                     time.sleep(0.5)
@@ -430,7 +442,7 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
             ws.append([
                 tid,
                 t.get("entry_type", ""),
-                t.get("date_payment", ""),
+                _fmt_date(t.get("date_payment", "")),  # DD-MM-YYYY
                 t.get("amount", ""),
                 t.get("name", ""),
                 t.get("category", ""),
