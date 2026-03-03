@@ -181,11 +181,7 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                     log(f"\n⏭ ID {tid} - já emitida com sucesso anteriormente. Pulando.")
                     index += 1
                     continue
-                if tid in ids_ignoradas:
-                    log(f"\n⏭ ID {tid} - ignorada na execução anterior. Pulando.")
-                    index += 1
-                    continue
-                # IDs com ERRO (ids_para_retentar) e IDs novas são processadas normalmente
+                # ERRO, IGNORADO e IDs novas são processadas normalmente
             # ───────────────────────────────────────────────────────────
 
             if transaction.get("entry_type") == "expense":
@@ -353,10 +349,10 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
 
                     wait.until(EC.presence_of_element_located((By.ID, "btnProsseguir")))
                     time.sleep(0.5)
-                    # driver.find_element(By.ID, "btnProsseguir").click()
+                    driver.find_element(By.ID, "btnProsseguir").click()
 
-                    # wait.until(EC.presence_of_element_located((By.ID, "btnDownloadDANFSE")))
-                    # time.sleep(0.5)
+                    wait.until(EC.presence_of_element_located((By.ID, "btnDownloadDANFSE")))
+                    time.sleep(0.5)
                     driver.get("https://www.nfse.gov.br/EmissorNacional/Dashboard")
 
                     sucesso = True
