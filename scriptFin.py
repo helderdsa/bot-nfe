@@ -294,10 +294,10 @@ try:
 
                     wait.until(EC.presence_of_element_located((By.ID, "btnProsseguir")))
                     time.sleep(0.5)
-                    # driver.find_element(By.ID, "btnProsseguir").click()
+                    driver.find_element(By.ID, "btnProsseguir").click()
 
-                    # wait.until(EC.presence_of_element_located((By.ID, "btnDownloadDANFSE")))
-                    # time.sleep(0.5)
+                    wait.until(EC.presence_of_element_located((By.ID, "btnDownloadDANFSE")))
+                    time.sleep(0.5)
                     driver.get("https://www.nfse.gov.br/EmissorNacional/Dashboard")
                     
                     # FINALIZAR ID: btnDownloadDANFSE

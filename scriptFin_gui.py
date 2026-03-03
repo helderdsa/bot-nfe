@@ -5,6 +5,7 @@ import threading
 import time
 import requests
 import openpyxl
+from openpyxl.styles import PatternFill, Font, Alignment
 from datetime import datetime
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
@@ -51,10 +52,10 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
     ids_puladas = []
 
     # ===== RETOMADA POR RELATÓRIO ANTERIOR =====
-    ids_ja_emitidas: set = set()
-    ids_para_retentar: set = set()
-    ids_faltaram_anterior: set = set()
-    ids_para_processar: set = set()
+    # Colunas do relatório: 0=ID, 9=Situação (SUCESSO | ERRO | IGNORADO)
+    ids_ja_emitidas: set = set()   # SUCESSO  – pular
+    ids_ignoradas: set = set()     # IGNORADO – pular
+    ids_para_retentar: set = set() # ERRO     – retentar
     usando_relatorio = bool(resume_path)
 
     if resume_path:
@@ -62,20 +63,20 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
             wb_resume = openpyxl.load_workbook(resume_path)
             ws_resume = wb_resume.active
             for row in ws_resume.iter_rows(min_row=2, values_only=True):
-                emitida = row[0] if len(row) > 0 else None
-                erro    = row[1] if len(row) > 1 else None
-                faltou  = row[2] if len(row) > 2 else None
-                if emitida:
-                    ids_ja_emitidas.add(emitida)
-                if erro:
-                    ids_para_retentar.add(erro)
-                if faltou:
-                    ids_faltaram_anterior.add(faltou)
-            ids_para_processar = ids_para_retentar | ids_faltaram_anterior
+                tid      = row[0] if len(row) > 0 else None
+                situacao = row[9] if len(row) > 9 else None
+                if tid is None:
+                    continue
+                if situacao == "SUCESSO":
+                    ids_ja_emitidas.add(tid)
+                elif situacao == "ERRO":
+                    ids_para_retentar.add(tid)
+                elif situacao == "IGNORADO":
+                    ids_ignoradas.add(tid)
             log("✓ Relatório anterior carregado:")
-            log(f"  - Já emitidas (serão puladas): {len(ids_ja_emitidas)}")
-            log(f"  - Puladas por erro (retentar): {len(ids_para_retentar)}")
-            log(f"  - Faltaram (serão processadas): {len(ids_faltaram_anterior)}")
+            log(f"  - ✅ SUCESSO  (serão puladas):  {len(ids_ja_emitidas)}")
+            log(f"  - ❌ ERRO     (serão retentadas): {len(ids_para_retentar)}")
+            log(f"  - ⏭ IGNORADO (serão puladas):  {len(ids_ignoradas)}")
         except Exception as exc:
             log(f"✗ Erro ao ler o relatório anterior: {exc}")
             return
@@ -177,15 +178,14 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
             # ── Filtro de retomada ──────────────────────────────────────
             if usando_relatorio:
                 if tid in ids_ja_emitidas:
-                    log(f"\n⏭ ID {tid} - já emitida anteriormente. Pulando.")
+                    log(f"\n⏭ ID {tid} - já emitida com sucesso anteriormente. Pulando.")
                     index += 1
                     continue
-                if tid not in ids_para_processar:
-                    # Transação não está na lista de pendências (era despesa
-                    # ou já estava tratada na execução anterior)
-                    log(f"\n⏭ ID {tid} - não consta na lista de pendências. Pulando.")
+                if tid in ids_ignoradas:
+                    log(f"\n⏭ ID {tid} - ignorada na execução anterior. Pulando.")
                     index += 1
                     continue
+                # IDs com ERRO (ids_para_retentar) e IDs novas são processadas normalmente
             # ───────────────────────────────────────────────────────────
 
             if transaction.get("entry_type") == "expense":
@@ -229,7 +229,7 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
 
                     wait.until(EC.presence_of_element_located((By.ID, "DataCompetencia")))
                     time.sleep(0.5)
-                    driver.find_element(By.ID, "DataCompetencia").send_keys("01/01/2026")
+                    driver.find_element(By.ID, "DataCompetencia").send_keys(transaction.get("date_payment", ""))
 
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "body")))
                     time.sleep(0.5)
@@ -353,6 +353,10 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
 
                     wait.until(EC.presence_of_element_located((By.ID, "btnProsseguir")))
                     time.sleep(0.5)
+                    # driver.find_element(By.ID, "btnProsseguir").click()
+
+                    # wait.until(EC.presence_of_element_located((By.ID, "btnDownloadDANFSE")))
+                    # time.sleep(0.5)
                     driver.get("https://www.nfse.gov.br/EmissorNacional/Dashboard")
 
                     sucesso = True
@@ -391,18 +395,63 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
         ids_processados = set(ids_emitidas) | set(ids_erro) | set(ids_puladas)
         ids_faltaram = [t.get("id") for t in transactions if t.get("id") not in ids_processados]
 
+        set_emitidas = set(ids_emitidas)
+        set_erro     = set(ids_erro)
+
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Relatório NF"
-        ws.append(["Emitidas", "Puladas por Erro", "Faltaram"])
 
-        max_len = max(len(ids_emitidas), len(ids_erro), len(ids_faltaram), 1)
-        for i in range(max_len):
+        # ── Cabeçalho ──────────────────────────────────────────────
+        headers = [
+            "ID", "Tipo", "Data Pagamento", "Valor", "Nome",
+            "Categoria", "Identificação", "Descrição", "Nº Processo", "Situação",
+        ]
+        ws.append(headers)
+        hdr_fill = PatternFill(start_color="2E4057", end_color="2E4057", fill_type="solid")
+        hdr_font = Font(bold=True, color="FFFFFF")
+        for cell in ws[1]:
+            cell.fill = hdr_fill
+            cell.font = hdr_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # ── Fills de situação ──────────────────────────────────────
+        fill_sucesso  = PatternFill(start_color="1E6B3C", end_color="1E6B3C", fill_type="solid")  # verde
+        fill_erro     = PatternFill(start_color="C00000", end_color="C00000", fill_type="solid")  # vermelho
+        fill_ignorado = PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid")  # azul
+        font_status   = Font(bold=True, color="FFFFFF")
+
+        # ── Linhas de dados ────────────────────────────────────────
+        for t in transactions:
+            tid = t.get("id")
+            if tid in set_emitidas:
+                situacao, fill = "SUCESSO", fill_sucesso
+            elif tid in set_erro:
+                situacao, fill = "ERRO", fill_erro
+            else:
+                situacao, fill = "IGNORADO", fill_ignorado
+
             ws.append([
-                ids_emitidas[i] if i < len(ids_emitidas) else "",
-                ids_erro[i] if i < len(ids_erro) else "",
-                ids_faltaram[i] if i < len(ids_faltaram) else "",
+                tid,
+                t.get("entry_type", ""),
+                t.get("date_payment", ""),
+                t.get("amount", ""),
+                t.get("name", ""),
+                t.get("category", ""),
+                t.get("identification", ""),
+                t.get("description", ""),
+                t.get("process_number", ""),
+                situacao,
             ])
+            situacao_cell = ws.cell(row=ws.max_row, column=len(headers))
+            situacao_cell.fill = fill
+            situacao_cell.font = font_status
+            situacao_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # ── Largura automática das colunas ─────────────────────────
+        for col in ws.columns:
+            max_w = max((len(str(cell.value or "")) for cell in col), default=10)
+            ws.column_dimensions[col[0].column_letter].width = min(max_w + 4, 55)
 
         # Quando empacotado pelo PyInstaller, usa a pasta do .exe
         if getattr(sys, 'frozen', False):
@@ -417,9 +466,9 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
 
         log("\n===== RELATÓRIO FINAL =====")
         log(f"✓ Planilha salva: {filename}")
-        log(f"  - Emitidas:         {len(ids_emitidas)}")
-        log(f"  - Puladas por erro: {len(ids_erro)}")
-        log(f"  - Faltaram:         {len(ids_faltaram)}")
+        log(f"  - ✅ SUCESSO  (verde):    {len(ids_emitidas)}")
+        log(f"  - ❌ ERRO     (vermelho): {len(ids_erro)}")
+        log(f"  - ⏭ IGNORADO (azul):     {len(transactions) - len(ids_emitidas) - len(ids_erro)}")
 
 
 # ============================================================
@@ -484,7 +533,7 @@ class App(ctk.CTk):
 
         # Frame de filtro de categoria
         cat_frame = ctk.CTkFrame(self)
-        cat_frame.pack(padx=30, pady=(0, 4), fill="x")
+        cat_frame.pack(padx=30, pady=(12, 12), fill="x")
 
         ctk.CTkLabel(cat_frame, text="Categoria:").grid(
             row=0, column=0, padx=(16, 8), pady=12, sticky="w"
@@ -505,7 +554,7 @@ class App(ctk.CTk):
             row=0, column=0, padx=(16, 8), pady=10, sticky="w"
         )
         self.entry_resume = ctk.CTkEntry(
-            file_frame, width=380, placeholder_text="Opcional – selecione o .xlsx gerado na última execução"
+            file_frame, width=360, placeholder_text="Opcional – selecione o .xlsx gerado na última execução"
         )
         self.entry_resume.grid(row=0, column=1, padx=(0, 8), pady=10)
         ctk.CTkButton(
