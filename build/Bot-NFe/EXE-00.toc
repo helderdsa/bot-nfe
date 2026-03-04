@@ -4103,7 +4103,7 @@
  [],
  False,
  False,
- 1772560373,
+ 1772564026,
  [('runw.exe',
    'C:\\Users\\helde\\OneDrive\\Documentos\\automação\\bot-nfe\\venv_win\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\runw.exe',
    'EXECUTABLE')],
