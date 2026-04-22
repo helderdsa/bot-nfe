@@ -72,7 +72,7 @@ try:
     
     # Header de autenticação
     headers = {
-        "Authorization": "Bearer 2gAucrPVxikEyTeHNj0QIhLQci2NE9u2hZTndQPV2D1E96J2RBfEaaVfG2Xh",
+        "Authorization": "Bearer JsI59yOw2G5YylBUIkb7xcTm2ord3jEUstXl0Z3Zi0m1FdfecWRw94conT6D",
         "Content-Type": "application/json",
         "Accept": "application/json",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

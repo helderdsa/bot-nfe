@@ -64,6 +64,39 @@ O script irá:
 
 ---
 
+## Criação do executável (.exe)
+
+Use o arquivo `Bot-NFe.spec` para gerar o executável (ele já contém as configurações necessárias do Selenium).
+
+### PowerShell (Windows)
+
+```powershell
+cd "C:\Users\helde\OneDrive\Documentos\automação\bot-nfe"
+.\venv_win\Scripts\pyinstaller.exe --clean Bot-NFe.spec
+```
+
+Saída gerada em:
+
+```text
+dist\Bot-NFe.exe
+```
+
+Se aparecer erro de arquivo em uso (`Access is denied` / `WinError 5`), feche o executável e rode:
+
+```powershell
+taskkill /F /IM Bot-NFe.exe
+.\venv_win\Scripts\pyinstaller.exe --clean Bot-NFe.spec
+```
+
+### WSL (alternativa)
+
+```bash
+cd "/mnt/c/Users/helde/OneDrive/Documentos/automação/bot-nfe"
+./venv_win/Scripts/pyinstaller.exe --clean Bot-NFe.spec
+```
+
+---
+
 ## Observações
 
 - O login no Emissor Nacional é feito via **certificado digital** (clique no ícone de certificado na tela de login).

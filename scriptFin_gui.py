@@ -9,11 +9,15 @@ from openpyxl.styles import PatternFill, Font, Alignment
 from datetime import datetime
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
+from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+
+
+load_dotenv()
 
 
 # ============================================================
@@ -26,6 +30,39 @@ def _fmt_date(date_str: str) -> str:
         return datetime.strptime(date_str, "%Y-%m-%d").strftime("%d-%m-%Y")
     except (ValueError, TypeError):
         return date_str or ""
+
+
+def _normalize_text(value) -> str:
+    """Normaliza texto para comparação sem ruído de espaços e caixa."""
+    return str(value or "").strip().upper()
+
+
+def _canonical_category(transaction: dict) -> str:
+    """Retorna a categoria canônica da transação para uso no filtro."""
+    category = _normalize_text(transaction.get("category", ""))
+    description = _normalize_text(transaction.get("description", ""))
+
+    # Alguns lançamentos de "Conta Azul" podem vir como IMPLANTAÇÕES
+    # e só serem distinguíveis pelo texto da descrição.
+    if category == "IMPLANTAÇÕES - CONTA AZUL":
+        return category
+    if category == "IMPLANTAÇÕES" and "CONTA AZUL" in description:
+        return "IMPLANTAÇÕES - CONTA AZUL"
+    return category
+
+
+def _matches_category_filter(transaction: dict, categoria_filtro: str) -> bool:
+    """Aplica o filtro de categoria separando IMPLANTAÇÕES de CONTA AZUL."""
+    if not categoria_filtro or categoria_filtro == "TODAS":
+        return True
+
+    filtro = _normalize_text(categoria_filtro)
+    categoria = _canonical_category(transaction)
+
+    if filtro == "IMPLANTAÇÕES":
+        return categoria == "IMPLANTAÇÕES"
+
+    return categoria == filtro
 
 
 # ============================================================
@@ -108,9 +145,15 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
             f"?date_payment_start={start_date}&date_payment_end={end_date}"
         )
 
+        api_token = os.getenv("ADVBOX_API_TOKEN", "JsI59yOw2G5YylBUIkb7xcTm2ord3jEUstXl0Z3Zi0m1FdfecWRw94conT6D").strip()
+        if not api_token:
+            log("✗ Token da API não configurado.")
+            log("✗ Defina ADVBOX_API_TOKEN no ambiente ou no arquivo .env.")
+            return
+
         session = requests.Session()
         headers = {
-            "Authorization": "Bearer 2gAucrPVxikEyTeHNj0QIhLQci2NE9u2hZTndQPV2D1E96J2RBfEaaVfG2Xh",
+            "Authorization": f"Bearer {api_token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
             "User-Agent": (
@@ -137,6 +180,12 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
             response = session.get(api_url, headers=headers)
             log(f"Status Code: {response.status_code} (offset={offset})")
 
+            if response.status_code == 401:
+                log("✗ Erro de autenticação na API (401 - Unauthenticated).")
+                log("✗ Verifique se o token ADVBOX_API_TOKEN está válido.")
+                log(f"✗ Resposta: {response.text}")
+                return
+
             if response.status_code != 200:
                 log(f"✗ Erro na API. Status: {response.status_code}")
                 log(f"✗ Resposta: {response.text}")
@@ -161,7 +210,7 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
 
         # ===== FILTRO DE CATEGORIA =====
         if categoria_filtro and categoria_filtro != "TODAS":
-            transactions = [t for t in transactions if t.get("category") == categoria_filtro]
+            transactions = [t for t in transactions if _matches_category_filter(t, categoria_filtro)]
             log(f"✓ Transações após filtro '{categoria_filtro}': {len(transactions)}")
 
         # ===== PROCESSAMENTO =====
@@ -550,7 +599,7 @@ class App(ctk.CTk):
         ctk.CTkOptionMenu(
             cat_frame,
             variable=self._var_categoria,
-            values=["TODAS", "IMPLANTAÇÕES", "PRECATÓRIOS", "ALVARÁS"],
+            values=["TODAS", "IMPLANTAÇÕES", "PRECATÓRIOS", "ALVARÁS", "IMPLANTAÇÕES - CONTA AZUL"],
             width=220,
         ).grid(row=0, column=1, padx=(0, 16), pady=12, sticky="w")
 
