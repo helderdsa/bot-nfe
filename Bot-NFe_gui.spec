@@ -1,12 +1,17 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_submodules
+
+
+selenium_hiddenimports = collect_submodules('selenium.webdriver')
+
 
 a = Analysis(
     ['scriptFin_gui.py'],
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=[],
+    hiddenimports=selenium_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
