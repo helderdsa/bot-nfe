@@ -14,6 +14,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 
 
@@ -284,6 +285,11 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                     time.sleep(0.5)
                     driver.find_element(By.CSS_SELECTOR, ".btnAcesso").click()
 
+                    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".radiobutton")))
+                    time.sleep(0.5)
+                    radio_options = driver.find_elements(By.CSS_SELECTOR, ".radiobutton")
+                    radio_options[0].find_element(By.CSS_SELECTOR, "label").click()
+                    
                     wait.until(EC.presence_of_element_located((By.ID, "DataCompetencia")))
                     time.sleep(0.5)
                     driver.find_element(By.ID, "DataCompetencia").send_keys(_fmt_date(transaction.get("date_payment", "")))
@@ -295,7 +301,12 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".radiobutton")))
                     time.sleep(0.5)
                     radio_options = driver.find_elements(By.CSS_SELECTOR, ".radiobutton")
-                    radio_options[4].find_element(By.CSS_SELECTOR, "label").click()
+                    radio_options[2].find_element(By.CSS_SELECTOR, "label").click()
+
+                    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".radiobutton")))
+                    time.sleep(0.5)
+                    radio_options = driver.find_elements(By.CSS_SELECTOR, ".radiobutton")
+                    radio_options[6].find_element(By.CSS_SELECTOR, "label").click()
 
                     wait.until(EC.presence_of_element_located((By.ID, "Tomador_Inscricao")))
                     time.sleep(0.5)
@@ -305,13 +316,21 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                         str(transaction.get("identification", ""))
                     )
 
-                    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "body")))
+                    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".radiobutton")))
                     time.sleep(0.5)
-                    driver.find_element(By.CSS_SELECTOR, "body").click()
+                    radio_options = driver.find_elements(By.CSS_SELECTOR, ".radiobutton")
+                    radio_options[12].find_element(By.CSS_SELECTOR, "label").click()
+                    radio_options[12].find_element(By.CSS_SELECTOR, "label").click()
+                    radio_options[12].find_element(By.CSS_SELECTOR, "label").click()
+
+                    time.sleep(5)
 
                     wait.until(EC.presence_of_element_located((By.ID, "btnAvancar")))
                     time.sleep(0.5)
                     driver.find_element(By.ID, "btnAvancar").click()
+
+#######################################################################################
+
 
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".select2-selection")))
                     time.sleep(0.5)
@@ -346,6 +365,32 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                     time.sleep(0.5)
                     driver.find_element(By.CSS_SELECTOR, "div.radiobutton > label").click()
 
+                    wait.until(EC.presence_of_element_located((By.ID, "ServicoPrestado_CodigoNBS_chosen")))
+                    time.sleep(0.5)
+                    driver.find_element(By.ID, "ServicoPrestado_CodigoNBS_chosen").click()
+
+                    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#ServicoPrestado_CodigoNBS_chosen .chosen-drop .chosen-search > input")))
+                    time.sleep(0.5)
+                    input = driver.find_element(By.CSS_SELECTOR, "#ServicoPrestado_CodigoNBS_chosen .chosen-drop .chosen-search > input")
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", input)
+                    input.click()
+                    input.send_keys("113012000")
+                    time.sleep(0.5)
+                    input.send_keys(Keys.ENTER)
+
+                    wait.until(EC.presence_of_element_located((By.ID, "ServicoPrestado_CodigoIndOp_chosen")))
+                    time.sleep(0.5)
+                    driver.find_element(By.ID, "ServicoPrestado_CodigoIndOp_chosen").click()
+                    
+                    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#ServicoPrestado_CodigoIndOp_chosen .chosen-drop .chosen-search > input")))
+                    time.sleep(0.5)
+                    input = driver.find_element(By.CSS_SELECTOR, "#ServicoPrestado_CodigoIndOp_chosen .chosen-drop .chosen-search > input")
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", input)
+                    input.click()
+                    input.send_keys("100301")
+                    time.sleep(0.5)
+                    input.send_keys(Keys.ENTER)
+
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#ServicoPrestado_Descricao")))
                     time.sleep(0.5)
                     driver.find_element(By.CSS_SELECTOR, "#ServicoPrestado_Descricao").click()
@@ -364,6 +409,8 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                     wait.until(EC.presence_of_element_located((By.CLASS_NAME, "btn-primary")))
                     time.sleep(0.5)
                     driver.find_element(By.CLASS_NAME, "btn-primary").click()
+
+#######################################################################################
 
                     wait.until(EC.presence_of_element_located((By.ID, "Valores_ValorServico")))
                     time.sleep(0.5)
@@ -404,10 +451,38 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                     ).click()
                     time.sleep(0.5)
 
+                    wait.until(EC.presence_of_element_located((By.ID, "ValorTributos_CodigoSituacaoTributaria_chosen")))
+                    time.sleep(0.5)
+                    field = driver.find_element(By.ID, "ValorTributos_CodigoSituacaoTributaria_chosen")
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", field)
+                    field.click()
+
+                    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#ValorTributos_CodigoSituacaoTributaria_chosen .chosen-drop .chosen-search > input")))
+                    time.sleep(0.5)
+                    input = driver.find_element(By.CSS_SELECTOR, "#ValorTributos_CodigoSituacaoTributaria_chosen .chosen-drop .chosen-search > input")
+                    input.click()
+                    input.send_keys("200")
+                    time.sleep(0.5)
+                    input.send_keys(Keys.ENTER)
+
+                    wait.until(EC.presence_of_element_located((By.ID, "ValorTributos_CodigoClassificacaoTributaria_chosen")))
+                    time.sleep(0.5)
+                    field = driver.find_element(By.ID, "ValorTributos_CodigoClassificacaoTributaria_chosen")
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", field)
+                    field.click()
+
+                    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "#ValorTributos_CodigoClassificacaoTributaria_chosen .chosen-drop .chosen-search > input")))
+                    time.sleep(0.5)
+                    input = driver.find_element(By.CSS_SELECTOR, "#ValorTributos_CodigoClassificacaoTributaria_chosen .chosen-drop .chosen-search > input")
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", input)
+                    input.click()
+                    input.send_keys("200052")
+                    time.sleep(0.5)
+                    input.send_keys(Keys.ENTER)
+
                     wait.until(EC.presence_of_element_located((By.CLASS_NAME, "btn-primary")))
                     time.sleep(0.5)
                     driver.find_element(By.CLASS_NAME, "btn-primary").click()
-
                     wait.until(EC.presence_of_element_located((By.ID, "btnProsseguir")))
                     time.sleep(0.5)
                     driver.find_element(By.ID, "btnProsseguir").click()
