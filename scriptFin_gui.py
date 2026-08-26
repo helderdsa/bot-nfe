@@ -483,12 +483,12 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                     wait.until(EC.presence_of_element_located((By.CLASS_NAME, "btn-primary")))
                     time.sleep(0.5)
                     driver.find_element(By.CLASS_NAME, "btn-primary").click()
-                    wait.until(EC.presence_of_element_located((By.ID, "btnProsseguir")))
-                    time.sleep(0.5)
-                    driver.find_element(By.ID, "btnProsseguir").click()
+                    # wait.until(EC.presence_of_element_located((By.ID, "btnProsseguir")))
+                    # time.sleep(0.5)
+                    # driver.find_element(By.ID, "btnProsseguir").click()
 
-                    wait.until(EC.presence_of_element_located((By.ID, "btnDownloadDANFSE")))
-                    time.sleep(0.5)
+                    # wait.until(EC.presence_of_element_located((By.ID, "btnDownloadDANFSE")))
+                    # time.sleep(0.5)
                     driver.get("https://www.nfse.gov.br/EmissorNacional/Dashboard")
 
                     sucesso = True
@@ -537,7 +537,7 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
         # ── Cabeçalho ──────────────────────────────────────────────
         headers = [
             "ID", "Tipo", "Data Pagamento", "Valor", "Nome",
-            "Categoria", "Identificação", "Descrição", "Nº Processo", "Situação",
+            "Categoria", "Identificação", "Descrição", "Nº Processo", "Situação", "error",
         ]
         ws.append(headers)
         hdr_fill = PatternFill(start_color="2E4057", end_color="2E4057", fill_type="solid")
@@ -574,6 +574,7 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                 t.get("description", ""),
                 t.get("process_number", ""),
                 situacao,
+                t.get("error", ""),
             ])
             situacao_cell = ws.cell(row=ws.max_row, column=len(headers))
             situacao_cell.fill = fill
