@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import queue
 import threading
@@ -24,6 +25,18 @@ load_dotenv()
 # ============================================================
 # Utilitários
 # ============================================================
+
+
+def extrair_numero(street: str) -> str:
+    if not street:
+        return ""
+    # Tenta achar "N°", "Nº", "N.", "NUM" seguido de número
+    match = re.search(r'N[º°.]?\s*[:.]?\s*(\d+)', street, re.IGNORECASE)
+    if match:
+        return match.group(1)
+    # Fallback: pega o último número da string
+    numeros = re.findall(r'\d+', street)
+    return numeros[-1] if numeros else "SEM N°"
 
 def _fmt_date(date_str: str) -> str:
     """Converte YYYY-MM-DD para DD-MM-YYYY."""
@@ -66,6 +79,56 @@ def _matches_category_filter(transaction: dict, categoria_filtro: str) -> bool:
     return categoria == filtro
 
 
+def _fetch_customer_address(session: requests.Session, headers: dict, identification: str,
+                             cache: dict, log: callable) -> dict:
+    """
+    Busca o endereço do cliente na API de customers a partir do CPF/CNPJ
+    (parâmetro 'identification') e retorna postalcode, region e street.
+
+    Usa um cache (dict) para não repetir a requisição para o mesmo
+    'identification' mais de uma vez durante a execução.
+    """
+    identification = str(identification or "").strip()
+    endereco_vazio = {"postalcode": "", "region": "", "street": ""}
+
+    if not identification:
+        return endereco_vazio
+
+    if identification in cache:
+        return cache[identification]
+
+    endereco = dict(endereco_vazio)
+    try:
+        url = "https://app.advbox.com.br/api/v1/customers"
+        params = {"identification": identification}
+        response = session.get(url, headers=headers, params=params)
+
+        if response.status_code == 200:
+            data_json = response.json()
+
+            # A API pode retornar tanto {"data": [...]}, {"data": {...}} ou uma lista direta.
+            payload = data_json.get("data", data_json) if isinstance(data_json, dict) else data_json
+
+            if isinstance(payload, list):
+                customer = payload[0] if payload else {}
+            elif isinstance(payload, dict):
+                customer = payload
+            else:
+                customer = {}
+
+            endereco["postalcode"] = customer.get("postalcode", "") or ""
+            endereco["region"] = customer.get("region", "") or ""
+            endereco["street"] = customer.get("street", "") or ""
+        else:
+            log(f"⚠ Não foi possível obter endereço do cliente {identification} (status {response.status_code})")
+
+    except Exception as exc:
+        log(f"⚠ Erro ao buscar endereço do cliente {identification}: {exc}")
+
+    cache[identification] = endereco
+    return endereco
+
+
 # ============================================================
 # Lógica do bot (adaptada para rodar em thread separada)
 # ============================================================
@@ -100,9 +163,10 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
     ids_emitidas = []
     ids_erro = []
     ids_puladas = []
+    customer_address_cache: dict = {}
 
     # ===== RETOMADA POR RELATÓRIO ANTERIOR =====
-    # Colunas do relatório: 0=ID, 9=Situação (SUCESSO | ERRO | IGNORADO)
+    # Colunas do relatório: 0=ID, 12=Situação (SUCESSO | ERRO | IGNORADO)
     ids_ja_emitidas: set = set()   # SUCESSO  – pular
     ids_ignoradas: set = set()     # IGNORADO – pular
     ids_para_retentar: set = set() # ERRO     – retentar
@@ -114,7 +178,7 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
             ws_resume = wb_resume.active
             for row in ws_resume.iter_rows(min_row=2, values_only=True):
                 tid      = row[0] if len(row) > 0 else None
-                situacao = row[9] if len(row) > 9 else None
+                situacao = row[12] if len(row) > 12 else None
                 if tid is None:
                     continue
                 if situacao == "SUCESSO":
@@ -260,6 +324,14 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                 index += 1
                 continue
 
+            # ── Busca do endereço do cliente (uma vez por transação) ────
+            endereco_cliente = _fetch_customer_address(
+                session, headers, transaction.get("identification", ""),
+                customer_address_cache, log
+            )
+            transaction["_endereco"] = endereco_cliente
+            # ───────────────────────────────────────────────────────────
+
             tentativas = 0
             sucesso = False
 
@@ -280,11 +352,18 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                     log(f"Valor: {transaction.get('amount')}")
                     log(f"Nome: {transaction.get('name')}")
                     log(f"Categoria: {transaction.get('category')}")
+                    log(f"Endereço: CEP {endereco_cliente.get('postalcode', '') or '(não encontrado)'} "
+                        f"- {endereco_cliente.get('street', '')} - {endereco_cliente.get('region', '')}")
 
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".btnAcesso")))
                     time.sleep(0.5)
                     driver.find_element(By.CSS_SELECTOR, ".btnAcesso").click()
 
+                    print(transaction.get("_endereco", ""))
+                    print(transaction.get("_endereco", {}).get("postalcode", ""))
+                    print(transaction.get("_endereco", {}).get("street", ""))
+                    print(transaction.get("_endereco", {}).get("region", ""))
+                    
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".radiobutton")))
                     time.sleep(0.5)
                     radio_options = driver.find_elements(By.CSS_SELECTOR, ".radiobutton")
@@ -316,6 +395,47 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                         str(transaction.get("identification", ""))
                     )
 
+                    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.checkbox > label")))
+                    time.sleep(0.5)
+                    checkbox = driver.find_elements(By.CSS_SELECTOR, "div.checkbox > label")
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", checkbox[1])
+                    checkbox[1].click()
+                    checkbox[1].click()
+
+                    wait.until(EC.presence_of_element_located((By.NAME, "Tomador.EnderecoNacional.CEP")))
+                    time.sleep(0.5)
+                    driver.find_element(By.NAME, "Tomador.EnderecoNacional.CEP").click()
+                    driver.find_element(By.NAME, "Tomador.EnderecoNacional.CEP").send_keys(
+                        transaction.get("_endereco", {}).get("postalcode", "")
+                    )
+
+                    wait.until(EC.presence_of_element_located((By.NAME, "Tomador.EnderecoNacional.Bairro")))
+                    time.sleep(2)
+                    driver.find_element(By.NAME, "Tomador.EnderecoNacional.Bairro").click()
+                    time.sleep(0.5)
+                    driver.find_element(By.NAME, "Tomador.EnderecoNacional.Bairro").clear()
+                    driver.find_element(By.NAME, "Tomador.EnderecoNacional.Bairro").send_keys(
+                        transaction.get("_endereco", {}).get("region", "")
+                    )
+
+                    wait.until(EC.presence_of_element_located((By.NAME, "Tomador.EnderecoNacional.Logradouro")))
+                    time.sleep(2)
+                    driver.find_element(By.NAME, "Tomador.EnderecoNacional.Logradouro").click()
+                    time.sleep(0.5)
+                    driver.find_element(By.NAME, "Tomador.EnderecoNacional.Logradouro").clear()
+                    driver.find_element(By.NAME, "Tomador.EnderecoNacional.Logradouro").send_keys(
+                        transaction.get("_endereco", {}).get("street", "")
+                    )
+
+                    wait.until(EC.presence_of_element_located((By.NAME, "Tomador.EnderecoNacional.Numero")))
+                    time.sleep(2)
+                    driver.find_element(By.NAME, "Tomador.EnderecoNacional.Numero").click()
+                    time.sleep(0.5)
+                    driver.find_element(By.NAME, "Tomador.EnderecoNacional.Numero").send_keys(
+                        extrair_numero(transaction.get("_endereco", {}).get("street", ""))
+                    )
+
+
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".radiobutton")))
                     time.sleep(0.5)
                     radio_options = driver.find_elements(By.CSS_SELECTOR, ".radiobutton")
@@ -329,8 +449,7 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                     time.sleep(0.5)
                     driver.find_element(By.ID, "btnAvancar").click()
 
-#######################################################################################
-
+######################################################################################
 
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".select2-selection")))
                     time.sleep(0.5)
@@ -483,12 +602,12 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                     wait.until(EC.presence_of_element_located((By.CLASS_NAME, "btn-primary")))
                     time.sleep(0.5)
                     driver.find_element(By.CLASS_NAME, "btn-primary").click()
-                    # wait.until(EC.presence_of_element_located((By.ID, "btnProsseguir")))
-                    # time.sleep(0.5)
-                    # driver.find_element(By.ID, "btnProsseguir").click()
+                    wait.until(EC.presence_of_element_located((By.ID, "btnProsseguir")))
+                    time.sleep(0.5)
+                    driver.find_element(By.ID, "btnProsseguir").click()
 
-                    # wait.until(EC.presence_of_element_located((By.ID, "btnDownloadDANFSE")))
-                    # time.sleep(0.5)
+                    wait.until(EC.presence_of_element_located((By.ID, "btnDownloadDANFSE")))
+                    time.sleep(0.5)
                     driver.get("https://www.nfse.gov.br/EmissorNacional/Dashboard")
 
                     sucesso = True
@@ -537,7 +656,9 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
         # ── Cabeçalho ──────────────────────────────────────────────
         headers = [
             "ID", "Tipo", "Data Pagamento", "Valor", "Nome",
-            "Categoria", "Identificação", "Descrição", "Nº Processo", "Situação", "error",
+            "Categoria", "Identificação", "Descrição", "Nº Processo",
+            "CEP", "Bairro/Região", "Rua",
+            "Situação", "error",
         ]
         ws.append(headers)
         hdr_fill = PatternFill(start_color="2E4057", end_color="2E4057", fill_type="solid")
@@ -563,6 +684,8 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
             else:
                 situacao, fill = "IGNORADO", fill_ignorado
 
+            endereco = t.get("_endereco", {}) or {}
+
             ws.append([
                 tid,
                 t.get("entry_type", ""),
@@ -573,10 +696,13 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                 t.get("identification", ""),
                 t.get("description", ""),
                 t.get("process_number", ""),
+                endereco.get("postalcode", ""),
+                endereco.get("region", ""),
+                endereco.get("street", ""),
                 situacao,
                 t.get("error", ""),
             ])
-            situacao_cell = ws.cell(row=ws.max_row, column=len(headers))
+            situacao_cell = ws.cell(row=ws.max_row, column=13)
             situacao_cell.fill = fill
             situacao_cell.font = font_status
             situacao_cell.alignment = Alignment(horizontal="center", vertical="center")
