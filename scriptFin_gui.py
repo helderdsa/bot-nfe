@@ -358,11 +358,6 @@ def run_bot(start_date: str, end_date: str, cancel_event: threading.Event, log: 
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".btnAcesso")))
                     time.sleep(0.5)
                     driver.find_element(By.CSS_SELECTOR, ".btnAcesso").click()
-
-                    print(transaction.get("_endereco", ""))
-                    print(transaction.get("_endereco", {}).get("postalcode", ""))
-                    print(transaction.get("_endereco", {}).get("street", ""))
-                    print(transaction.get("_endereco", {}).get("region", ""))
                     
                     wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".radiobutton")))
                     time.sleep(0.5)
